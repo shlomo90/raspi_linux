@@ -152,10 +152,10 @@ Eoverflow:
  */
 ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 {
-	struct seq_file *m = file->private_data;
-	size_t copied = 0;
-	size_t n;
-	void *p;
+	struct seq_file *m = file->private_data;    // LIM: When open time, already assigned 
+	size_t copied = 0;                          // LIM: m->op = PDE(inode)->seq_ops ==> dev_seq_ops
+	size_t n;                                   // LIM: file->private_data = seq_file_cache
+	void *p;                                    // LIM: file->private_data->op = PDE(inode)->seq_ops
 	int err = 0;
 
 	mutex_lock(&m->lock);
@@ -628,16 +628,17 @@ void *__seq_open_private(struct file *f, const struct seq_operations *ops,
 	void *private;
 	struct seq_file *seq;
 
-	private = kzalloc(psize, GFP_KERNEL_ACCOUNT);
+	private = kzalloc(psize, GFP_KERNEL_ACCOUNT);   //LIM: psize = PDE(inode)->state_size
 	if (private == NULL)
 		goto out;
 
-	rc = seq_open(f, ops);
+	rc = seq_open(f, ops);  // LIM: f->private_data = new [seq_file]
+                            // LIM: new [seq_file] -> op = PDE(inode)->seq_ops (when open time)
 	if (rc < 0)
 		goto out_free;
 
 	seq = f->private_data;
-	seq->private = private;
+	seq->private = private; // LIM: new [seq_file] -> private = new private
 	return private;
 
 out_free:

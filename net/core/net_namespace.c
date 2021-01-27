@@ -121,7 +121,7 @@ static int net_assign_generic(struct net *net, unsigned int id, void *data)
 static int ops_init(const struct pernet_operations *ops, struct net *net)
 {
 	int err = -ENOMEM;
-	void *data = NULL;
+	void *data = NULL;      //LIM: ops is dev_proc_ops
 
 	if (ops->id && ops->size) {
 		data = kzalloc(ops->size, GFP_KERNEL);
@@ -134,7 +134,7 @@ static int ops_init(const struct pernet_operations *ops, struct net *net)
 	}
 	err = 0;
 	if (ops->init)
-		err = ops->init(net);
+		err = ops->init(net);   //LIM: .init = dev_proc_net_init, .exit = dev_proc_net_exit,
 	if (!err)
 		return 0;
 
@@ -1129,20 +1129,20 @@ pure_initcall(net_ns_init);
 static int __register_pernet_operations(struct list_head *list,
 					struct pernet_operations *ops)
 {
-	struct net *net;
+	struct net *net;            //LIM: net_namespace.h:54
 	int error;
-	LIST_HEAD(net_exit_list);
+	LIST_HEAD(net_exit_list);   //LIM: local list_head
 
-	list_add_tail(&ops->list, list);
+	list_add_tail(&ops->list, list);    // list add ops to the tail of "pernet_list".
 	if (ops->init || (ops->id && ops->size)) {
 		/* We held write locked pernet_ops_rwsem, and parallel
 		 * setup_net() and cleanup_net() are not possible.
 		 */
-		for_each_net(net) {
+		for_each_net(net) {     //LIM: Iterate net_namespace_list (static) and each elem is "net"
 			error = ops_init(ops, net);
 			if (error)
 				goto out_undo;
-			list_add_tail(&net->exit_list, &net_exit_list);
+			list_add_tail(&net->exit_list, &net_exit_list); //LIM: To cleanup added "struct net".
 		}
 	}
 	return 0;
@@ -1206,7 +1206,7 @@ static DEFINE_IDA(net_generic_ids);
 static int register_pernet_operations(struct list_head *list,
 				      struct pernet_operations *ops)
 {
-	int error;
+	int error;              // LIM: list is likely to be pernet_list.
 
 	if (ops->id) {
 		error = ida_alloc_min(&net_generic_ids, MIN_PERNET_OPS_ID,
@@ -1216,7 +1216,7 @@ static int register_pernet_operations(struct list_head *list,
 		*ops->id = error;
 		max_gen_ptrs = max(max_gen_ptrs, *ops->id + 1);
 	}
-	error = __register_pernet_operations(list, ops);
+	error = __register_pernet_operations(list, ops);    //LIM: init "ops" to current net_namespaces
 	if (error) {
 		rcu_barrier();
 		if (ops->id)
@@ -1256,9 +1256,9 @@ static void unregister_pernet_operations(struct pernet_operations *ops)
 int register_pernet_subsys(struct pernet_operations *ops)
 {
 	int error;
-	down_write(&pernet_ops_rwsem);
-	error =  register_pernet_operations(first_device, ops);
-	up_write(&pernet_ops_rwsem);
+	down_write(&pernet_ops_rwsem);  //LIM: pernet_ops_resem: protect pernet_list, net_generic_ids...
+	error =  register_pernet_operations(first_device, ops); //LIM: first_device is list_head of static pernet_list
+	up_write(&pernet_ops_rwsem);    //LIM: unlock
 	return error;
 }
 EXPORT_SYMBOL_GPL(register_pernet_subsys);

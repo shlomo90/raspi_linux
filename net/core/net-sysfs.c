@@ -509,7 +509,7 @@ static ssize_t phys_switch_id_show(struct device *dev,
 static DEVICE_ATTR_RO(phys_switch_id);
 
 static struct attribute *net_class_attrs[] __ro_after_init = {
-	&dev_attr_netdev_group.attr,
+	&dev_attr_netdev_group.attr,    //LIM: Each attr is defined with DEVICE_ATTR. Look in this file.
 	&dev_attr_type.attr,
 	&dev_attr_dev_id.attr,
 	&dev_attr_dev_port.attr,
@@ -1783,6 +1783,6 @@ EXPORT_SYMBOL(netdev_class_remove_file_ns);
 
 int __init netdev_kobject_init(void)
 {
-	kobj_ns_type_register(&net_ns_type_operations);
-	return class_register(&net_class);
+	kobj_ns_type_register(&net_ns_type_operations); //LIM: TODO: IDK. kobj_ns_type does
+	return class_register(&net_class);  //LIM: net_class are hard coded. TODO: IDK.
 }

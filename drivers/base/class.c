@@ -151,7 +151,9 @@ static void class_remove_groups(struct class *cls,
 
 int __class_register(struct class *cls, struct lock_class_key *key)
 {
-	struct subsys_private *cp;
+    // LIM: subsys_private structure is the one that is the actual kobject allowing struct
+    //      bus_type/class to be statically allocated safely.
+	struct subsys_private *cp;  //LIM: cls is likely to be net_class.
 	int error;
 
 	pr_debug("device class '%s': registering\n", cls->name);
@@ -159,6 +161,7 @@ int __class_register(struct class *cls, struct lock_class_key *key)
 	cp = kzalloc(sizeof(*cp), GFP_KERNEL);
 	if (!cp)
 		return -ENOMEM;
+    // LIM: init cp->klist_devices, assign getter putter
 	klist_init(&cp->klist_devices, klist_class_dev_get, klist_class_dev_put);
 	INIT_LIST_HEAD(&cp->interfaces);
 	kset_init(&cp->glue_dirs);
@@ -175,16 +178,16 @@ int __class_register(struct class *cls, struct lock_class_key *key)
 
 #if defined(CONFIG_BLOCK)
 	/* let the block class directory show up in the root of sysfs */
-	if (!sysfs_deprecated || cls != &block_class)
+	if (!sysfs_deprecated || cls != &block_class)   //LIM: sysfx_deprecated is 0
 		cp->subsys.kobj.kset = class_kset;
 #else
 	cp->subsys.kobj.kset = class_kset;
 #endif
 	cp->subsys.kobj.ktype = &class_ktype;
 	cp->class = cls;
-	cls->p = cp;
+	cls->p = cp;        //LIM: net_class can acccess "cp" with net_class->p.
 
-	error = kset_register(&cp->subsys);
+	error = kset_register(&cp->subsys); //LIM: ???
 	if (error) {
 		kfree(cp);
 		return error;

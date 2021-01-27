@@ -9926,11 +9926,11 @@ static struct hlist_head * __net_init netdev_create_hash(void)
 {
 	int i;
 	struct hlist_head *hash;
-
+                        //LIM: 2^8 elements of hash
 	hash = kmalloc_array(NETDEV_HASHENTRIES, sizeof(*hash), GFP_KERNEL);
 	if (hash != NULL)
 		for (i = 0; i < NETDEV_HASHENTRIES; i++)
-			INIT_HLIST_HEAD(&hash[i]);
+			INIT_HLIST_HEAD(&hash[i]);  //LIM: Init hash node.
 
 	return hash;
 }
@@ -9944,11 +9944,11 @@ static int __net_init netdev_init(struct net *net)
 	if (net != &init_net)
 		INIT_LIST_HEAD(&net->dev_base_head);
 
-	net->dev_name_head = netdev_create_hash();
+	net->dev_name_head = netdev_create_hash();  //LIM: net->dev_name_head has 2^8 hash nodes.
 	if (net->dev_name_head == NULL)
 		goto err_name;
 
-	net->dev_index_head = netdev_create_hash();
+	net->dev_index_head = netdev_create_hash(); //LIM: net->dev_index_had has 2^8 hash nodes.
 	if (net->dev_index_head == NULL)
 		goto err_idx;
 
@@ -10045,7 +10045,7 @@ define_netdev_printk_level(netdev_info, KERN_INFO);
 
 static void __net_exit netdev_exit(struct net *net)
 {
-	kfree(net->dev_name_head);
+	kfree(net->dev_name_head);  //LIM: 2^8 hash nodes
 	kfree(net->dev_index_head);
 	if (net != &init_net)
 		WARN_ON_ONCE(!list_empty(&net->dev_base_head));
@@ -10173,32 +10173,45 @@ static int __init net_dev_init(void)
 {
 	int i, rc = -ENOMEM;
 
-	BUG_ON(!dev_boot_phase);
+	BUG_ON(!dev_boot_phase);    // LIM: BUG_ON(condition): Break if condition is true.
 
-	if (dev_proc_init())
-		goto out;
-
+	if (dev_proc_init())        // LIM: net-procfs.c:361
+		goto out;               // LIM: register pernet_subsys: dev_proc_ops, dev_mc_net_ops
+                                // LIM: a network namespace subsystem: init, exit functions that are called
+                                //      when nework namespaces are created and destroyed respectively.
 	if (netdev_kobject_init())
 		goto out;
 
-	INIT_LIST_HEAD(&ptype_all);
-	for (i = 0; i < PTYPE_HASH_SIZE; i++)
-		INIT_LIST_HEAD(&ptype_base[i]);
+	INIT_LIST_HEAD(&ptype_all); // LIM: ptype_all is read_mostly (static) global variable.
+	for (i = 0; i < PTYPE_HASH_SIZE; i++)   //LIM: ptype is packet type.
+		INIT_LIST_HEAD(&ptype_base[i]);     //LIM: ptype_base is ptype_hash array
+                                            //LIM: each list is init
 
-	INIT_LIST_HEAD(&offload_base);
+	INIT_LIST_HEAD(&offload_base);  //LIM: static variable meaning used only here.
 
-	if (register_pernet_subsys(&netdev_net_ops))
+	if (register_pernet_subsys(&netdev_net_ops))    //LIM: Pay attention! Regester netdev
 		goto out;
 
 	/*
 	 *	Initialise the packet receive queues.
 	 */
 
-	for_each_possible_cpu(i) {
-		struct work_struct *flush = per_cpu_ptr(&flush_works, i);
-		struct softnet_data *sd = &per_cpu(softnet_data, i);
+	for_each_possible_cpu(i) {  //LIM: SMP: cpus that current available.    i is cpu id.
+		struct work_struct *flush = per_cpu_ptr(&flush_works, i);   //LIM: flush_works defined by DEFINE_PER_CPU
+		struct softnet_data *sd = &per_cpu(softnet_data, i);    //LIM: Incoming packets are placed on per-CPU queues
 
-		INIT_WORK(flush, flush_backlog);
+		INIT_WORK(flush, flush_backlog);    //LIM: IDK..
+        // LIM:  I think it's about WORKQUEUE
+        //
+        // _onstack is 0
+        //
+        // do {								\
+        //     __init_work((_work), _onstack);				\           <-- Do nothing
+        //     (_work)->data = (atomic_long_t) WORK_DATA_INIT();	\   <-- WORK_STRUCT_NO_POOL
+        //     INIT_LIST_HEAD(&(_work)->entry);			\               <-- INIT_LIST_HEAD(&(flush)->entry)
+        //     (_work)->func = (_func);				\                   <-- flush->func = flush_backlog
+        // } while (0)
+        //
 
 		skb_queue_head_init(&sd->input_pkt_queue);
 		skb_queue_head_init(&sd->process_queue);
@@ -10214,7 +10227,7 @@ static int __init net_dev_init(void)
 #endif
 
 		init_gro_hash(&sd->backlog);
-		sd->backlog.poll = process_backlog;
+		sd->backlog.poll = process_backlog; //LIM: This Actually packet receive started.
 		sd->backlog.weight = weight_p;
 	}
 
@@ -10235,7 +10248,7 @@ static int __init net_dev_init(void)
 	if (register_pernet_device(&default_device_ops))
 		goto out;
 
-	open_softirq(NET_TX_SOFTIRQ, net_tx_action);
+	open_softirq(NET_TX_SOFTIRQ, net_tx_action);    //LIM: softirq? Run net_tx_action after interrupted.
 	open_softirq(NET_RX_SOFTIRQ, net_rx_action);
 
 	rc = cpuhp_setup_state_nocalls(CPUHP_NET_DEV_DEAD, "net/dev:dead",
@@ -10247,3 +10260,21 @@ out:
 }
 
 subsys_initcall(net_dev_init);
+// LIM: Below code is defined.
+// static void * __attribute__((__section__(.discard.addressable) __used
+//       __addressable_net_dev_init10249 = (void *)&net_dev_init;
+//            asm('.section    ".initcall4.init", "a"   \n'
+//                '__initcall_net_dev_init4:            \n'
+//                '.previous                            \n');
+//
+// __section("section"): Compiler makes the funcion place in specific "section".
+// __used: It means that code must be emitted for the function even if it appears
+//         that the function is not referenced. This is useful, for example, when
+//         the function is referenced only in inline assembly.
+//
+// Why does they do this shit???
+//  These macros are used to mark some functions or 
+//  initialized data (doesn't apply to uninitialized data)
+//  as `initialization' functions. The kernel can take this
+//  as hint that the function is used only during the initialization
+//  phase and free up used memory resources after

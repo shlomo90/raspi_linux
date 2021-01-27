@@ -273,15 +273,30 @@ static const struct seq_operations ptype_seq_ops = {
 };
 
 static int __net_init dev_proc_net_init(struct net *net)
-{
+{   // LIM: net is net_namespace_list's each element.
 	int rc = -ENOMEM;
 
+    // LIM:
+    //              mode ------------+      +-- parent (ex: net/"
+    //                               v      v
+    // proc_create_net_data("dev", 0444, net->proc_net, &dev_seq_ops, sizeof(...), NULL)
+    //
+    // Create Files in /proc/net. File operations: proc_net_seq_fops
+    // Basically Same with proc_create_seq but, It adds "pde->proc_dops".
+    //  -> Because of network namespace directory.
+    //
+    // [proc_dir_entry]->fops = proc_net_seq_fops <-- When cat /proc/net/dev, First call this
+    // [proc_dir_entry]->ops = dev_seq_ops      <-- Second call
 	if (!proc_create_net("dev", 0444, net->proc_net, &dev_seq_ops,
 			sizeof(struct seq_net_private)))
 		goto out;
+
+    // proc_create_seq_private: File operations: proc_seq_fops
+    // Create sequence files
 	if (!proc_create_seq("softnet_stat", 0444, net->proc_net,
 			 &softnet_seq_ops))
 		goto out_dev;
+
 	if (!proc_create_net("ptype", 0444, net->proc_net, &ptype_seq_ops,
 			sizeof(struct seq_net_private)))
 		goto out_softnet;
@@ -362,6 +377,6 @@ int __init dev_proc_init(void)
 {
 	int ret = register_pernet_subsys(&dev_proc_ops);
 	if (!ret)
-		return register_pernet_subsys(&dev_mc_net_ops);
+		return register_pernet_subsys(&dev_mc_net_ops); //LIM: Do the same thing to dev_proc_ops
 	return ret;
 }

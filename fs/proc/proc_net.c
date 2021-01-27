@@ -63,6 +63,7 @@ static int seq_open_net(struct inode *inode, struct file *file)
 
 	WARN_ON_ONCE(state_size < sizeof(*p));
 
+    // LIM: File mode is write but ther is no write op? => Access Error
 	if (file->f_mode & FMODE_WRITE && !PDE(inode)->write)
 		return -EACCES;
 
@@ -70,6 +71,8 @@ static int seq_open_net(struct inode *inode, struct file *file)
 	if (!net)
 		return -ENXIO;
 
+    // LIM: Allocate "file->private" == p == private
+    // LIM: p->private, p->op assigned
 	p = __seq_open_private(file, PDE(inode)->seq_ops, state_size);
 	if (!p) {
 		put_net(net);
@@ -104,6 +107,8 @@ struct proc_dir_entry *proc_create_net_data(const char *name, umode_t mode,
 {
 	struct proc_dir_entry *p;
 
+    // LIM: name can be "dev", parent can be "/proc/net"
+    // LIM: p == PDE(inode)
 	p = proc_create_reg(name, mode, &parent, data);
 	if (!p)
 		return NULL;

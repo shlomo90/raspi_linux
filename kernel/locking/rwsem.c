@@ -1530,7 +1530,7 @@ EXPORT_SYMBOL(down_read_trylock);
  */
 void __sched down_write(struct rw_semaphore *sem)
 {
-	might_sleep();
+	might_sleep();      //LIM: For debugging. Notice which function might sleep.
 	rwsem_acquire(&sem->dep_map, 0, 0, _RET_IP_);
 	LOCK_CONTENDED(sem, __down_write_trylock, __down_write);
 }
